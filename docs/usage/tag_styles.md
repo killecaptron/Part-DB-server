@@ -36,3 +36,8 @@ At most one rule is ever applied to a given tag:
 
 Tags that don't match any rule keep their previous, unstyled appearance. The existing tag filter and search behavior
 are not affected by tag styles - they only change how a tag is rendered.
+
+## Managing the settings via the API
+
+Besides the settings page, the rule list can also be read and replaced through the API - see
+[Settings API](settings_api.md).

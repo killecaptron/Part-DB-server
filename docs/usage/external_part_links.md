@@ -53,3 +53,8 @@ not shown.
 Only `https://` URLs are ever rendered as a link, whether they come from a template or from a parameter. Links that
 would resolve to any other scheme (e.g. `javascript:` or `data:`) or to an invalid URL are silently skipped instead of
 being shown.
+
+## Managing the settings via the API
+
+Besides the settings page, the link definitions can also be read and replaced through the API - see
+[Settings API](settings_api.md).
