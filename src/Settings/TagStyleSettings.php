@@ -33,6 +33,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[Settings(name: "tag_styles", label: new TM("settings.tag_styles"), description: "settings.tag_styles.help")]
 #[SettingsIcon("fa-tags")]
+#[SettingsApiExposed]
 class TagStyleSettings
 {
     use SettingsTrait;
