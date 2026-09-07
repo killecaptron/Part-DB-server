@@ -33,6 +33,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 #[Settings(name: "external_part_links", label: new TM("settings.external_part_links"), description: "settings.external_part_links.help")]
 #[SettingsIcon("fa-up-right-from-square")]
+#[SettingsApiExposed]
 class ExternalPartLinkSettings
 {
     use SettingsTrait;
