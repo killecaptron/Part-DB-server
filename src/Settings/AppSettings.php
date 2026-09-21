@@ -55,6 +55,9 @@ class AppSettings
     public ?ExternalPartLinkSettings $externalPartLinks = null;
 
     #[EmbeddedSettings]
+    public ?TagStyleSettings $tagStyles = null;
+
+    #[EmbeddedSettings]
     public ?AISettings $ai = null;
 
     #[EmbeddedSettings()]
