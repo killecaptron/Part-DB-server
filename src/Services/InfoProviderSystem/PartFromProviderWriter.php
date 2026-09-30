@@ -68,7 +68,17 @@ final readonly class PartFromProviderWriter
         $dto = $this->infoRetriever->getDetails($provider_key, $provider_id,
             [InfoProviderInterface::OPTION_NO_CACHE => $no_cache]);
 
+        $original_name = $part->getName();
+        $original_description = $part->getDescription();
         $this->partMerger->merge($part, $this->infoRetriever->dtoToPart($dto));
+
+        // Provider refreshes fill missing text but must not append to manually maintained fields on every run.
+        if (trim($original_name) !== '') {
+            $part->setName($original_name);
+        }
+        if (trim($original_description) !== '') {
+            $part->setDescription($original_description);
+        }
 
         $changes = $this->changeSetBuilder->build($part);
 
