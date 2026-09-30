@@ -54,6 +54,7 @@ final class DTOtoEntityConverter
 {
     private const TYPE_DATASHEETS_NAME = 'Datasheet';
     private const TYPE_IMAGE_NAME = 'Image';
+    private const BLOCKED_DISTRIBUTOR_NAMES = ['rochester electronics'];
 
     private readonly string $base_currency;
 
@@ -243,6 +244,10 @@ final class DTOtoEntityConverter
             if (!Attachment::isSafeExternalURL($datasheet->url)) {
                 continue;
             }
+            if ($datasheet->name !== null
+                && stripos($datasheet->name, 'Rochester Electronics') !== false) {
+                continue;
+            }
 
             $attachment = $this->convertFile($datasheet, $datasheet_type);
 
@@ -256,6 +261,11 @@ final class DTOtoEntityConverter
 
         //Add orderdetails and prices
         foreach ($dto->vendor_infos ?? [] as $vendor_info) {
+            $distributor_name = preg_replace('/\s+/', ' ', trim($vendor_info->distributor_name));
+            if (in_array(strtolower($distributor_name ?? ''), self::BLOCKED_DISTRIBUTOR_NAMES, true)) {
+                continue;
+            }
+
             $entity->addOrderdetail($this->convertPurchaseInfo($vendor_info));
         }
 
