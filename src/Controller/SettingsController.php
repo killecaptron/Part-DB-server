@@ -24,6 +24,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use Symfony\Component\Form\Extension\Core\Type\SubmitType;
+use App\Services\Settings\ExposedSettingsRegistry;
+use App\Services\Settings\SettingsWriteLockService;
 use App\Settings\AppSettings;
 use Jbtronics\SettingsBundle\Form\SettingsFormFactoryInterface;
 use Jbtronics\SettingsBundle\Manager\SettingsManagerInterface;
@@ -37,8 +39,12 @@ use function Symfony\Component\Translation\t;
 
 class SettingsController extends AbstractController
 {
-    public function __construct(private readonly SettingsManagerInterface $settingsManager, private readonly SettingsFormFactoryInterface $settingsFormFactory)
-    {}
+    public function __construct(
+        private readonly SettingsManagerInterface $settingsManager,
+        private readonly SettingsFormFactoryInterface $settingsFormFactory,
+        private readonly ExposedSettingsRegistry $exposedSettings,
+        private readonly SettingsWriteLockService $settingsWriteLockService,
+    ) {}
 
     #[Route("/settings", name: "system_settings")]
     public function systemSettings(Request $request, TagAwareCacheInterface $cache): Response
@@ -64,7 +70,17 @@ class SettingsController extends AbstractController
         //If the form was submitted and is valid, save the settings
         if ($form->isSubmitted() && $form->isValid()) {
             $this->settingsManager->mergeTemporaryCopy($settings);
-            $this->settingsManager->save($settings);
+
+            //This form saves the whole settings tree at once, including every settings which is also writable
+            //through the API - even on a page load where the administrator did not touch that section at all.
+            //Take the same locks the API takes, so a concurrent API write can not be silently overwritten by this
+            //save (or the other way around).
+            $this->settingsWriteLockService->withLock(
+                $this->exposedSettings->getWritableSettingsClasses(),
+                function () use ($settings): void {
+                    $this->settingsManager->save($settings);
+                }
+            );
 
             //It might be possible, that the tree settings have changed, so clear the cache
             $cache->invalidateTags(['tree_tools', 'tree_treeview', 'sidebar_tree_update', 'synonyms']);
