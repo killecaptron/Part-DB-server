@@ -255,11 +255,52 @@ final class DTOtoEntityConverter
         }
 
         //Add orderdetails and prices
+        //A provider can list several offers of a distributor under the same order number (e.g. from different
+        //warehouses or lots). A part can only have one orderdetail per supplier and order number (see the
+        //UniqueEntity constraint on Orderdetail), so these offers are merged into one orderdetail.
+        $orderdetails = [];
         foreach ($dto->vendor_infos ?? [] as $vendor_info) {
-            $entity->addOrderdetail($this->convertPurchaseInfo($vendor_info));
+            $orderdetail = $this->convertPurchaseInfo($vendor_info);
+            //Suppliers of the same name are the same object here, even if they are new (see findOrCreateForInfoProvider())
+            $key = spl_object_id($orderdetail->getSupplier()) . "\0" . $orderdetail->getSupplierPartNr();
+
+            if (isset($orderdetails[$key])) {
+                $this->mergeOffer($orderdetails[$key], $orderdetail);
+                continue;
+            }
+
+            $orderdetails[$key] = $orderdetail;
+            $entity->addOrderdetail($orderdetail);
         }
 
         return $entity;
+    }
+
+    /**
+     * Merges a further offer of the same supplier and order number into the orderdetail of the first one.
+     * The first offer wins for everything it has: price tiers are only added for quantities it has no price for,
+     * and its product URL is only replaced if it has none. Of the stocks, the highest one is taken, as the offers
+     * can also describe the same stock (e.g. for different regions), which must not be counted twice.
+     */
+    private function mergeOffer(Orderdetail $target, Orderdetail $other): void
+    {
+        foreach ($other->getPricedetails() as $other_price) {
+            foreach ($target->getPricedetails() as $target_price) {
+                if ($target_price->getMinDiscountQuantity() === $other_price->getMinDiscountQuantity()) {
+                    continue 2;
+                }
+            }
+            $target->addPricedetail($other_price);
+        }
+
+        if ($target->getSupplierProductUrl(true) === '' && $other->getSupplierProductUrl(true) !== '') {
+            $target->setSupplierProductUrl($other->getSupplierProductUrl(true));
+        }
+
+        if ($other->getAvailableAmount() !== null
+            && ($target->getAvailableAmount() === null || $other->getAvailableAmount() > $target->getAvailableAmount())) {
+            $target->setAvailableAmount($other->getAvailableAmount(), $other->getAvailableAmountUpdatedAt());
+        }
     }
 
     /**

@@ -235,4 +235,38 @@ final class DTOtoEntityConverterTest extends WebTestCase
         $datasheet = $entity->getAttachments()[5];
         $this->assertSame('Duplicate (3)', $datasheet->getName());
     }
+
+    public function testConvertPartMergesOffersWithTheSameSupplierAndOrderNumber(): void
+    {
+        $dto = new PartDetailDTO(
+            provider_key: 'test_provider', provider_id: 'test_id', name: 'TestPart', description: 'TestDescription',
+            vendor_infos: [
+                new PurchaseInfoDTO('TestDistributor', 'ABC-1', [new PriceDTO(1, "10.0", 'EUR')], available_amount: 100.0),
+                //The same distributor and order number from another warehouse: a further price tier and more stock
+                new PurchaseInfoDTO('TestDistributor', 'ABC-1', [new PriceDTO(1, "12.0", 'EUR'), new PriceDTO(10, "8.0", 'EUR')],
+                    product_url: 'https://example.com/abc-1', available_amount: 300.0),
+                new PurchaseInfoDTO('TestDistributor', 'ABC-1', [], available_amount: 50.0),
+                //Another order number and another distributor stay orderdetails of their own
+                new PurchaseInfoDTO('TestDistributor', 'ABC-2', [new PriceDTO(1, "11.0", 'EUR')]),
+                new PurchaseInfoDTO('OtherDistributor', 'ABC-1', [new PriceDTO(1, "9.0", 'EUR')]),
+            ]
+        );
+
+        $orderdetails = $this->service->convertPart($dto)->getOrderdetails();
+
+        $this->assertCount(3, $orderdetails);
+        $merged = $orderdetails[0];
+        $this->assertSame('ABC-1', $merged->getSupplierPartNr());
+        $this->assertSame('TestDistributor', $merged->getSupplier()->getName());
+        //The first offer wins for the quantity both have a price for
+        $this->assertSame([1.0, 10.0], array_map(static fn($p) => $p->getMinDiscountQuantity(), $merged->getPricedetails()->toArray()));
+        $this->assertTrue($merged->getPricedetails()[0]->getPrice()->isEqualTo(10));
+        $this->assertSame($merged, $merged->getPricedetails()[1]->getOrderdetail());
+        $this->assertSame('https://example.com/abc-1', $merged->getSupplierProductUrl(true));
+        //The offers can describe the same stock, so the highest one is taken instead of the sum
+        $this->assertSame(300.0, $merged->getAvailableAmount());
+
+        $this->assertSame('ABC-2', $orderdetails[1]->getSupplierPartNr());
+        $this->assertSame('OtherDistributor', $orderdetails[2]->getSupplier()->getName());
+    }
 }
